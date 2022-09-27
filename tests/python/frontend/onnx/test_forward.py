@@ -1368,6 +1368,45 @@ def test_batch_matmul(target, dev):
 
 
 @tvm.testing.parametrize_targets
+def test_einsum(target, dev):
+    a_shape = (20, 30, 40)
+    b_shape = (20, 40, 60)
+    out_shape = [20, 30, 60]
+    #a_shape = (20, 30, 40)
+    #b_shape = (20, 50, 40)
+    #out_shape = [20, 30, 50]
+
+    a_array = np.random.uniform(size=a_shape).astype("float32")
+    b_array = np.random.uniform(size=b_shape).astype("float32")
+
+    #Eqn = "b i d, b j d -> b i j"
+    Eqn = "b i j, b j d -> b i d"
+    einsum_node = helper.make_node(
+        "Einsum", inputs=["a", "b"], outputs=["out"], equation=Eqn
+    )
+
+    graph = helper.make_graph(
+        [einsum_node],
+        "einsum_test",
+        inputs=[
+            helper.make_tensor_value_info("a", TensorProto.FLOAT, list(a_shape)),
+            helper.make_tensor_value_info("b", TensorProto.FLOAT, list(b_shape)),
+        ],
+        outputs=[helper.make_tensor_value_info("out", TensorProto.FLOAT, out_shape)],
+    )
+
+    model = helper.make_model(graph, producer_name="einsum_test")
+    verify_with_ort_with_inputs(
+        model,
+        [a_array, b_array],
+        use_vm=True,
+        target=target,
+        dev=dev,
+    )
+
+
+
+@tvm.testing.parametrize_targets
 def test_use_nt_batch_matmul(target, dev):
     """test_use_nt_batch_matmul"""
     a_shape = (2, 3, 4)

@@ -4765,7 +4765,35 @@ class Einsum(OnnxOpConverter):
 
     @classmethod
     def _impl_v12(cls, inputs, attr, params):
+        def get_shape(exp):
+            ty = relay.transform.InferType()(tvm.IRModule.from_expr(exp))[
+                "main"
+            ].body.checked_type
+            return ty.shape
+
         equation = attr["equation"].decode("utf-8")
+
+        lhs = inputs[0]
+        rhs = inputs[1]
+
+        if equation == "b i d, b j d -> b i j":
+            B, I, D = get_shape(lhs)
+            B, J, D = get_shape(rhs)
+
+            bmm = _op.nn.batch_matmul(lhs, rhs)
+            print("returning", bmm)
+            return bmm
+        elif equation == "b i j, b j d -> b i d":
+            B, I, J = get_shape(lhs)
+            B, J, D = get_shape(rhs)
+
+            lhs_bij = lhs
+            rhs_bdj = _op.transpose(rhs, [0, 2, 1])
+            bmm = _op.nn.batch_matmul(lhs_bij, rhs_bdj)
+            print("returning", bmm)
+            return bmm
+
+        print("returning einsum")
         return _op.einsum(inputs, equation)
 
 
